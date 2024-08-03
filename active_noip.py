@@ -10,6 +10,7 @@ import imaplib
 import email
 from email.header import decode_header
 from datetime import datetime
+from datetime import timedelta
 from time import sleep
 
 login_url = 'https://www.noip.com/login'
@@ -23,7 +24,6 @@ imap_ssl_port = int(os.getenv("IMAP_SSL_PORT", '993'))
 email_username = os.getenv("EMAIL_USERNAME")
 email_password = os.getenv("EMAIL_PASSWORD")
 driver_path = r'/opt/chromedriver-linux64/chromedriver'
-chrome_path = r'/opt/google/chrome/chrome'
 active_email_title = 'ACTION REQUIRED'
 valid_code_email_title = 'No-IP Verification Code:'
 last_active_date_file = r'/opt/active_date'
@@ -47,7 +47,7 @@ def is_need_run_task():
     last_active_date = read_last_active_date()
     if last_active_date is None or last_active_date == '':
         return True
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date = (datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d")
     if current_date > last_active_date:
         return True
     else:
@@ -68,7 +68,7 @@ def email_server():
 
 # 搜索邮件 获取最新一封
 def search_email(mail_server, title):
-    date_str = datetime.now().strftime("%d-%b-%Y")
+    date_str = (datetime.now()-timedelta(days=1)).strftime("%d-%b-%Y")
     # 搜索邮件
     status, msg_nums = mail_server.search(None, 'SINCE', date_str, 'SUBJECT', title)
     nums = msg_nums[0].split()
@@ -110,8 +110,7 @@ def check_email(mail):
 def active_noip(mail, num):
     num = num + 1
     options = webdriver.ChromeOptions()
-    options.binary_location = chrome_path
-    # options.add_argument('--no-sandbox')  # 允许无沙盒模式运行
+    options.add_argument('--no-sandbox')  # 允许无沙盒模式运行
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
     options.add_experimental_option('useAutomationExtension', False)
     options.add_argument("--headless")
@@ -143,6 +142,7 @@ def active_noip(mail, num):
         if driver.current_url == 'https://my.noip.com/':
             break
         elif driver.current_url == 'https://www.noip.com/2fa/verify':
+            print('NOIP valid code page')
             time.sleep(60)
             valid_code = read_valid_code(mail)
             while valid_code is None:
@@ -161,6 +161,7 @@ def active_noip(mail, num):
 
     driver.get(dynamic_dns_url)
     time.sleep(15)
+    print('NOIP dynamic dns page')
     success = False
     active_flag = False
     div_element = driver.find_element(value='host-panel')
