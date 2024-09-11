@@ -21,9 +21,9 @@ ___NOIP_USERNAME___ NOIP账号
 ___NOIP_PASSWORD___ NOIP密码  
 
 #### 启动
-######QQ邮箱    
+QQ邮箱    
 docker run -d --restart=always --name noipactive -e EMAIL_USERNAME="" -e EMAIL_PASSWORD="" -e NOIP_USERNAME="" -e NOIP_PASSWORD="" wuyufei1993/noipactive:latest    
-######其他邮箱需要配置SMTP服务器和IMAP服务器相关参数    
+其他邮箱需要配置SMTP服务器和IMAP服务器相关参数    
 docker run -d --restart=always --name noipactive -e SMTP_HOST="" -e SMTP_SSL_PORT="" -e IMAP_HOST="" -e IMAP_SSL_PORT="" -e EMAIL_USERNAME="" -e EMAIL_PASSWORD="" -e NOIP_USERNAME="" -e NOIP_PASSWORD="" wuyufei1993/noipactive:latest
 
 
