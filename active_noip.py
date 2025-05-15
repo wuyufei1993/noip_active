@@ -140,7 +140,8 @@ def active_noip(mail, num):
     try:
         while True:
             driver.get(login_url)
-            driver.implicitly_wait(30)
+            driver.implicitly_wait(60)
+            sleep(3)
             username_input = driver.find_element(value='username')
             if username_input is not None:
                 username_input.click()
@@ -156,12 +157,14 @@ def active_noip(mail, num):
             if submit_button is not None:
                 submit_button.click()
                 driver.implicitly_wait(60)
+                sleep(3)
             print(f'chrome browser current url {driver.current_url}')
             if driver.current_url == 'https://my.noip.com/':
                 print('login success')
                 break
             elif driver.current_url == 'https://www.noip.com/2fa/verify':
                 print('login need email verify')
+                driver.implicitly_wait(60)
                 sleep(60)
                 valid_code = read_valid_code(mail)
                 while valid_code is None:
@@ -177,11 +180,12 @@ def active_noip(mail, num):
                 if verify_button is not None:
                     verify_button.click()
                     break
-
+        driver.implicitly_wait(60)
         sleep(15)
         process_locale_mismatch_modal(driver)
         driver.get(dynamic_dns_url)
         driver.implicitly_wait(60)
+        sleep(120)
         div_element = driver.find_element(value='host-panel')
         # 判断是否为激活状态
         a_web_elements = div_element.find_elements(By.TAG_NAME, 'a')
@@ -209,6 +213,7 @@ def active_noip(mail, num):
             # 激活状态，不需要重新激活
             return
         driver.get(dynamic_dns_url)
+        driver.implicitly_wait(60)
         sleep(15)
         img_base64 = driver.get_screenshot_as_base64()
     except TimeoutError:
