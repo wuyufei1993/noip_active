@@ -22,10 +22,15 @@ imap_host = os.getenv("IMAP_HOST")
 imap_ssl_port = int(os.getenv("IMAP_SSL_PORT", '993'))
 email_username = os.getenv("EMAIL_USERNAME")
 email_password = os.getenv("EMAIL_PASSWORD")
-driver_path = r'/opt/chromedriver-linux64/chromedriver'
 active_email_title = 'ACTION REQUIRED'
 valid_code_email_title = 'No-IP Verification Code:'
-last_active_date_file = r'/opt/active_date'
+
+if os.name == 'nt':
+    driver_path = r'chromedriver-win64/chromedriver.exe'
+    last_active_date_file = r'active_date'
+else:
+    driver_path = r'/opt/chromedriver-linux64/chromedriver'
+    last_active_date_file = r'/opt/active_date'
 
 
 def read_last_active_date():
@@ -46,7 +51,7 @@ def is_need_run_task():
     last_active_date = read_last_active_date()
     if last_active_date is None or last_active_date == '':
         return True
-    current_date = (datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d")
+    current_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
     if current_date > last_active_date:
         return True
     else:
@@ -67,7 +72,7 @@ def email_server():
 
 # 搜索邮件 获取最新一封
 def search_email(mail_server, title):
-    date_str = (datetime.now()-timedelta(days=1)).strftime("%d-%b-%Y")
+    date_str = (datetime.now() - timedelta(days=1)).strftime("%d-%b-%Y")
     # 搜索邮件
     status, msg_nums = mail_server.search(None, 'SINCE', date_str, 'SUBJECT', title)
     nums = msg_nums[0].split()
@@ -108,10 +113,13 @@ def check_email(mail):
 
 def process_locale_mismatch_modal(driver):
     modal = driver.find_element(value='mismatchLanguageModal')
-    is_hidden = modal.get_dom_attribute("aria-hidden")
-    if is_hidden == 'false':
-        cancel_button = driver.find_element(value='modalLocaleMismatchDismissed')
-        cancel_button.click()
+    if modal is not None:
+        is_hidden = modal.get_dom_attribute("aria-hidden")
+        if is_hidden == 'false':
+            cancel_button = driver.find_element(value='modalLocaleMismatchDismissed')
+            cancel_button.click()
+            sleep(1)
+
 
 def active_noip(mail, num):
     num = num + 1
@@ -119,7 +127,8 @@ def active_noip(mail, num):
     options.add_argument('--no-sandbox')  # 允许无沙盒模式运行
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
     options.add_experimental_option('useAutomationExtension', False)
-    options.add_argument("--headless")
+    if os.name != 'nt':
+        options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument('--disable-dev-shm-usage')  # 在低内存系统上避免使用/dev/shm
@@ -145,10 +154,13 @@ def active_noip(mail, num):
             submit_button = driver.find_element(value='clogs-captcha-button')
             if submit_button is not None:
                 submit_button.click()
-
+                driver.implicitly_wait(60)
+            print(f'chrome browser current url {driver.current_url}')
             if driver.current_url == 'https://my.noip.com/':
+                print('login success')
                 break
             elif driver.current_url == 'https://www.noip.com/2fa/verify':
+                print('login need email verify')
                 sleep(60)
                 valid_code = read_valid_code(mail)
                 while valid_code is None:
@@ -165,10 +177,10 @@ def active_noip(mail, num):
                     verify_button.click()
                     break
 
-        driver.get(dynamic_dns_url)
-        driver.implicitly_wait(60)
         sleep(15)
         process_locale_mismatch_modal(driver)
+        driver.get(dynamic_dns_url)
+        driver.implicitly_wait(60)
         div_element = driver.find_element(value='host-panel')
         # 判断是否为激活状态
         a_web_elements = div_element.find_elements(By.TAG_NAME, 'a')
