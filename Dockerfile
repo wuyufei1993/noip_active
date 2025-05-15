@@ -1,13 +1,10 @@
-FROM ubuntu:24.10
+FROM wuyufei1993/chrome_for_testing:136.0.7103.94
+WORKDIR /opt
 RUN echo 'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble main restricted universe multiverse' >> /etc/apt/sources.list
 RUN echo 'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-updates main restricted universe multiverse' >> /etc/apt/sources.list
 RUN echo 'deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ noble-backports main restricted universe multiverse' >> /etc/apt/sources.list
 RUN echo 'deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse' >> /etc/apt/sources.list
-RUN apt update && apt -y install python3 python3-selenium
-ADD ./google-chrome-stable/google-chrome-stable_current_amd64.deb /
-RUN dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -f -y
-RUN rm -rf /google-chrome-stable_current_amd64.deb
-ADD chromedriver-linux64/ /opt/chromedriver-linux64/
+RUN apt update
 ADD active_noip.py /opt/
 ADD run.sh /opt/
 ENV TZ=Asia/Shanghai
