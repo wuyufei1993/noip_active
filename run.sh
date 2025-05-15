@@ -2,6 +2,7 @@
 #6*60*60 6小时
 echo 'noip active run...'
 echo '#########################################################################'
+RUN chmod +x /opt/chromedriver-linux64/chromedriver
 sleep_time=21600
 while :
   do
