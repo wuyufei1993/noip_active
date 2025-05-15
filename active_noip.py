@@ -4,6 +4,7 @@ import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 import smtplib
 import imaplib
 import email
@@ -132,9 +133,11 @@ def active_noip(mail, num):
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument('--disable-dev-shm-usage')  # 在低内存系统上避免使用/dev/shm
+    options.add_argument('window-size=900,900')
 
     driver = webdriver.Chrome(service=Service(driver_path), options=options)
     driver.implicitly_wait(60)
+    actions = ActionChains(driver)
     success = False
     active_flag = False
     try:
@@ -155,6 +158,7 @@ def active_noip(mail, num):
 
             submit_button = driver.find_element(value='clogs-captcha-button')
             if submit_button is not None:
+                actions.move_to_element(submit_button).perform()
                 submit_button.click()
                 driver.implicitly_wait(60)
                 sleep(3)
@@ -173,6 +177,7 @@ def active_noip(mail, num):
                 opt_input = driver.find_element(value='otp-input')
                 valid_code_inputs = opt_input.find_elements(By.TAG_NAME, 'input')
                 for index, valid_code_input in enumerate(valid_code_inputs):
+                    actions.move_to_element(valid_code_input).perform()
                     valid_code_input.click()
                     valid_code_input.send_keys(valid_code[index])
 
