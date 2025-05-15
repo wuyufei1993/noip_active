@@ -138,8 +138,9 @@ def active_noip(mail, num):
     success = False
     active_flag = False
     try:
-        driver.get(login_url)
         while True:
+            driver.get(login_url)
+            driver.implicitly_wait(30)
             username_input = driver.find_element(value='username')
             if username_input is not None:
                 username_input.click()
