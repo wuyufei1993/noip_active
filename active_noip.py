@@ -161,6 +161,7 @@ def login(driver, mail, actions):
             actions.move_to_element(valid_code_input).perform()
             valid_code_input.click()
             valid_code_input.send_keys(valid_code[index])
+        driver.implicitly_wait(60)
         sleep(10)
         if driver.current_url == 'https://www.noip.com/2fa/verify':
             verify_button = driver.find_element(By.NAME, 'Verify')
