@@ -14,6 +14,7 @@ from datetime import timedelta
 from time import sleep
 
 login_url = 'https://www.noip.com/login'
+login_success_url = 'https://my.noip.com/'
 dynamic_dns_url = "https://my.noip.com/dynamic-dns"
 noip_username = os.getenv("NOIP_USERNAME")
 noip_password = os.getenv("NOIP_PASSWORD")
@@ -122,6 +123,97 @@ def process_locale_mismatch_modal(driver):
             sleep(1)
 
 
+def login(driver, mail, actions):
+    driver.get(login_url)
+    driver.implicitly_wait(60)
+    sleep(3)
+    username_input = driver.find_element(value='username')
+    if username_input is not None:
+        username_input.click()
+        if username_input.text is None or username_input.text == '':
+            username_input.send_keys(noip_username)
+
+    password_input = driver.find_element(value='password')
+    if password_input is not None:
+        password_input.click()
+        password_input.send_keys(noip_password)
+
+    submit_button = driver.find_element(value='clogs-captcha-button')
+    if submit_button is not None:
+        actions.move_to_element(submit_button).perform()
+        submit_button.click()
+        driver.implicitly_wait(60)
+        sleep(3)
+    print(f'chrome browser current url {driver.current_url}')
+    if driver.current_url == login_success_url:
+        return
+    elif driver.current_url == 'https://www.noip.com/2fa/verify':
+        print('login need email verify')
+        driver.implicitly_wait(60)
+        sleep(60)
+        valid_code = read_valid_code(mail)
+        while valid_code is None:
+            sleep(10)
+            valid_code = read_valid_code(mail)
+        opt_input = driver.find_element(value='otp-input')
+        valid_code_inputs = opt_input.find_elements(By.TAG_NAME, 'input')
+        for index, valid_code_input in enumerate(valid_code_inputs):
+            actions.move_to_element(valid_code_input).perform()
+            valid_code_input.click()
+            valid_code_input.send_keys(valid_code[index])
+
+        verify_button = driver.find_element(By.NAME, 'submit')
+        if verify_button is not None:
+            verify_button.click()
+            return
+
+
+def active_dynamic_host(driver):
+    process_locale_mismatch_modal(driver)
+    dynamic_dns_url_num = 0
+    success = False
+    active_flag = False
+    while True:
+        driver.get(dynamic_dns_url)
+        dynamic_dns_url_num = dynamic_dns_url_num + 1
+        driver.implicitly_wait(60)
+        if driver.current_url == dynamic_dns_url:
+            break
+        if dynamic_dns_url_num < 20:
+            print(f'Failed to redirect to activation page, current URL: {driver.current_url}, failed attempts: {dynamic_dns_url_num}.')
+        else:
+            print(f'Failed to redirect to activation page, current URL: {driver.current_url}, failed attempts: {dynamic_dns_url_num}, activation stopped!')
+            return success, active_flag
+
+    # 等待列表数据加载，数据由异步请求加载
+    sleep(120)
+    div_element = driver.find_element(value='host-panel')
+    # 判断是否为激活状态
+    a_web_elements = div_element.find_elements(By.TAG_NAME, 'a')
+    for a_web_element in a_web_elements:
+        if a_web_element is None or not a_web_element.text:
+            continue
+        confirm_str = a_web_element.get_dom_attribute('data-original-title')
+        if confirm_str and 'Active' in a_web_element.text and confirm_str.startswith('Confirm'):
+            # 已激活
+            success = True
+            active_flag = True
+            write_last_active_date()
+            print('NOIP activated, No action required')
+            break
+        elif a_web_element.text.startswith('Expires in '):
+            # 需要进行激活操作
+            button_web_elements = driver.find_elements(By.TAG_NAME, 'button')
+            for button_web_element in button_web_elements:
+                if 'Confirm' in button_web_element.text:
+                    button_web_element.click()
+                    sleep(60)
+                    success = True
+                    print('NoIp active success')
+                    break
+    return success, active_flag
+
+
 def active_noip(mail, num):
     num = num + 1
     options = webdriver.ChromeOptions()
@@ -138,93 +230,39 @@ def active_noip(mail, num):
     driver = webdriver.Chrome(service=Service(driver_path), options=options)
     driver.implicitly_wait(60)
     actions = ActionChains(driver)
+    login_state = True
     success = False
     active_flag = False
     try:
+        login_num = 0
         while True:
-            driver.get(login_url)
-            driver.implicitly_wait(60)
-            sleep(3)
-            username_input = driver.find_element(value='username')
-            if username_input is not None:
-                username_input.click()
-                if username_input.text is None or username_input.text == '':
-                    username_input.send_keys(noip_username)
-
-            password_input = driver.find_element(value='password')
-            if password_input is not None:
-                password_input.click()
-                password_input.send_keys(noip_password)
-
-            submit_button = driver.find_element(value='clogs-captcha-button')
-            if submit_button is not None:
-                actions.move_to_element(submit_button).perform()
-                submit_button.click()
-                driver.implicitly_wait(60)
-                sleep(3)
-            print(f'chrome browser current url {driver.current_url}')
-            if driver.current_url == 'https://my.noip.com/':
+            login(driver, mail, actions)
+            login_num = login_num + 1
+            if driver.current_url == login_success_url:
                 print('login success')
                 break
-            elif driver.current_url == 'https://www.noip.com/2fa/verify':
-                print('login need email verify')
-                driver.implicitly_wait(60)
-                sleep(60)
-                valid_code = read_valid_code(mail)
-                while valid_code is None:
-                    sleep(60)
-                    valid_code = read_valid_code(mail)
-                opt_input = driver.find_element(value='otp-input')
-                valid_code_inputs = opt_input.find_elements(By.TAG_NAME, 'input')
-                for index, valid_code_input in enumerate(valid_code_inputs):
-                    actions.move_to_element(valid_code_input).perform()
-                    valid_code_input.click()
-                    valid_code_input.send_keys(valid_code[index])
-
-                verify_button = driver.find_element(By.NAME, 'submit')
-                if verify_button is not None:
-                    verify_button.click()
-                    break
-        driver.implicitly_wait(60)
-        sleep(15)
-        process_locale_mismatch_modal(driver)
-        driver.get(dynamic_dns_url)
-        driver.implicitly_wait(60)
-        sleep(120)
-        div_element = driver.find_element(value='host-panel')
-        # 判断是否为激活状态
-        a_web_elements = div_element.find_elements(By.TAG_NAME, 'a')
-        for a_web_element in a_web_elements:
-            if a_web_element is None or not a_web_element.text:
-                continue
-            confirm_str = a_web_element.get_dom_attribute('data-original-title')
-            if confirm_str and 'Active' in a_web_element.text and confirm_str.startswith('Confirm'):
-                # 已激活
-                success = True
-                active_flag = True
-                write_last_active_date()
-                print('NOIP activated, No action required')
+            if login_num < 50:
+                print(f'Login failed, current URL：{driver.current_url}，logged in {login_num} times')
+            else:
+                print(f'Login failed, current URL：{driver.current_url}，logged in {login_num} times. This activation has failed!')
+                login_state = False
                 break
-            elif a_web_element.text.startswith('Expires in '):
-                # 需要进行激活操作
-                button_web_elements = driver.find_elements(By.TAG_NAME, 'button')
-                for button_web_element in button_web_elements:
-                    if 'Confirm' in button_web_element.text:
-                        button_web_element.click()
-                        success = True
-                        print('NoIp active success')
-                        break
+
+        if login_state:
+            success, active_flag = active_dynamic_host(driver)
+        # 页面跳转等待
+        driver.implicitly_wait(60)
+        sleep(30)
         if active_flag:
             # 激活状态，不需要重新激活
+            print('Currently activated, no reactivation required.')
             return
-        driver.get(dynamic_dns_url)
-        driver.implicitly_wait(60)
-        sleep(15)
         img_base64 = driver.get_screenshot_as_base64()
     except TimeoutError:
         if num < 4:
             active_noip(mail, num)
-    except Exception:
+    except Exception as e:
+        print(f'exception: {e}')
         img_base64 = driver.get_screenshot_as_base64()
     finally:
         driver.quit()
@@ -238,11 +276,9 @@ def active_noip(mail, num):
         print('NoIp active fail')
         message["Subject"] = "NOIP激活失败，请及时处理！"
 
-    # message["From"] = f'NOIP激活提示<{email_username}>'
-    # message["To"] = f'NOIP激活提示<{email_username}>'
     message["From"] = email_username
     message["To"] = email_username
-    message.attach(MIMEText(f'<img src=\"data:image/jpg;base64,{img_base64}\"/>', "html"))
+    message.attach(MIMEText(f'<h1>CURRENT_URL:{driver.current_url}</h1><br/><img src=\"data:image/jpg;base64,{img_base64}\"/>', "html"))
     with smtplib.SMTP_SSL(smtp_host, smtp_ssl_port) as server:
         # 登录到邮件服务器
         server.login(email_username, email_password)
@@ -262,4 +298,5 @@ def task():
         mail.logout()
 
 
-task()
+if __name__ == '__main__':
+    task()
