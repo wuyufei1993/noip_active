@@ -207,11 +207,30 @@ def active_dynamic_host(driver):
             for button_web_element in button_web_elements:
                 if 'Confirm' in button_web_element.text:
                     button_web_element.click()
-                    sleep(60)
+                    sleep(20)
                     success = True
                     print('NoIp active success')
                     break
     return success, active_flag
+
+
+def send_result(current_url, active_result, img_base64):
+    message = MIMEMultipart("alternative")
+    if active_result:
+        write_last_active_date()
+        message["Subject"] = "NOIP激活成功！！！！！！！"
+    else:
+        print('NoIp active fail')
+        message["Subject"] = "NOIP激活失败，请及时处理！"
+
+    message["From"] = email_username
+    message["To"] = email_username
+    message.attach(MIMEText(f'<h1>CURRENT_URL:{current_url}</h1><br/><img src=\"data:image/jpg;base64,{img_base64}\"/>', "html"))
+    with smtplib.SMTP_SSL(smtp_host, smtp_ssl_port) as server:
+        # 登录到邮件服务器
+        server.login(email_username, email_password)
+        # 发送邮件
+        server.sendmail(email_username, email_username, message.as_string())
 
 
 def active_noip(mail, num):
@@ -233,26 +252,28 @@ def active_noip(mail, num):
     login_state = True
     success = False
     active_flag = False
+    img_base64 = None
+    current_url = None
     try:
         login_num = 0
         while True:
             login(driver, mail, actions)
             login_num = login_num + 1
-            if driver.current_url == login_success_url:
+            current_url = driver.current_url
+            if current_url == login_success_url:
                 print('login success')
                 break
             if login_num < 50:
-                print(f'Login failed, current URL：{driver.current_url}，logged in {login_num} times')
+                print(f'Login failed, current URL：{current_url}，logged in {login_num} times')
             else:
-                print(f'Login failed, current URL：{driver.current_url}，logged in {login_num} times. This activation has failed!')
+                print(f'Login failed, current URL：{current_url}，logged in {login_num} times. This activation has failed!')
                 login_state = False
                 break
 
         if login_state:
             success, active_flag = active_dynamic_host(driver)
         # 页面跳转等待
-        driver.implicitly_wait(60)
-        sleep(30)
+        sleep(10)
         if active_flag:
             # 激活状态，不需要重新激活
             print('Currently activated, no reactivation required.')
@@ -265,25 +286,14 @@ def active_noip(mail, num):
         print(f'exception: {e}')
         img_base64 = driver.get_screenshot_as_base64()
     finally:
+        current_url = driver.current_url
         driver.quit()
 
-    message = MIMEMultipart("alternative")
-
-    if success:
-        write_last_active_date()
-        message["Subject"] = "NOIP激活成功！！！！！！！"
-    else:
-        print('NoIp active fail')
-        message["Subject"] = "NOIP激活失败，请及时处理！"
-
-    message["From"] = email_username
-    message["To"] = email_username
-    message.attach(MIMEText(f'<h1>CURRENT_URL:{driver.current_url}</h1><br/><img src=\"data:image/jpg;base64,{img_base64}\"/>', "html"))
-    with smtplib.SMTP_SSL(smtp_host, smtp_ssl_port) as server:
-        # 登录到邮件服务器
-        server.login(email_username, email_password)
-        # 发送邮件
-        server.sendmail(email_username, email_username, message.as_string())
+    try:
+        send_result(current_url, success, img_base64)
+    except Exception as e:
+        print('send email fail')
+        print(e)
     if not success and num < 4:
         sleep(600 * num)
         active_noip(mail, num)
