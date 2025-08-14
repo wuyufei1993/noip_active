@@ -15,7 +15,7 @@ from time import sleep
 
 login_url = 'https://www.noip.com/login'
 login_success_url = 'https://my.noip.com/'
-dynamic_dns_url = "https://my.noip.com/dynamic-dns"
+dynamic_dns_url = "https://my.noip.com/dns/records"
 noip_username = os.getenv("NOIP_USERNAME")
 noip_password = os.getenv("NOIP_PASSWORD")
 smtp_host = os.getenv("SMTP_HOST")
@@ -162,7 +162,7 @@ def login(driver, mail, actions):
             valid_code_input.click()
             valid_code_input.send_keys(valid_code[index])
         driver.implicitly_wait(60)
-        sleep(10)
+        sleep(5)
         if driver.current_url == 'https://www.noip.com/2fa/verify':
             verify_button = driver.find_element(By.NAME, 'Verify')
             if verify_button is not None:
@@ -191,32 +191,23 @@ def active_dynamic_host(driver):
 
     # 等待列表数据加载，数据由异步请求加载
     sleep(120)
-    div_element = driver.find_element(value='host-panel')
-    # 判断是否为激活状态
-    a_web_elements = div_element.find_elements(By.TAG_NAME, 'a')
-    for a_web_element in a_web_elements:
-        if a_web_element is None or not a_web_element.text:
-            continue
-        confirm_str = a_web_element.get_dom_attribute('data-original-title')
-        if confirm_str and 'Active' in a_web_element.text and confirm_str.startswith('Confirm'):
-            # 已激活
-            success = True
-            active_flag = True
-            write_last_active_date()
-            print('NOIP activated, No action required')
-            break
-        elif a_web_element.text.startswith('Expires in '):
-            # 需要进行激活操作
-            button_web_elements = driver.find_elements(By.TAG_NAME, 'button')
+    content_wrapper = driver.find_element(value='content-wrapper')
+    div_elements = content_wrapper.find_elements(By.TAG_NAME, 'div')
+    for div_element in div_elements:
+        div_id = div_element.get_dom_attribute('id')
+        if div_id is not None and div_id.startswith('expiration-banner-hostname'):
+            active_flag = False
+            # 需要激活
+            button_web_elements = div_element.find_elements(By.TAG_NAME, 'button')
+            # 找激活按钮
             for button_web_element in button_web_elements:
                 if 'Confirm' in button_web_element.text:
                     button_web_element.click()
                     sleep(20)
                     success = True
                     print('NoIp active success')
-                    break
-    return success, active_flag
-
+                    return success, active_flag
+    return True, True
 
 def send_result(current_url, active_result, img_base64):
     message = MIMEMultipart("alternative")
